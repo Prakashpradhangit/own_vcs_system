@@ -20,7 +20,7 @@ class Groot {
     async init() {
         await fs.mkdir(this.objectsPath, { recursive: true });
         console.log("Initialized the repository");
-        
+
         try {
             await fs.writeFile(this.headPath, '', { flag: 'wx' });
             await fs.writeFile(this.indexPath, JSON.stringify([]), { flag: 'wx' });
@@ -80,33 +80,49 @@ class Groot {
     async status() {
         try {
             const stagedFiles = JSON.parse(await fs.readFile(this.indexPath, { encoding: 'utf-8' }));
-            const allFiles = await fs.readdir(process.cwd()); // Fix: Use process.cwd() instead of this.workingDirectory
-            
+            const allFiles = await fs.readdir(process.cwd());
+
             const stagedPaths = new Set(stagedFiles.map(entry => entry.path));
             const unstagedFiles = allFiles.filter(file => !stagedPaths.has(file));
-            
+
             if (stagedFiles.length > 0) {
                 console.log(chalk.blue("Staged files:"));
                 stagedFiles.forEach(entry => console.log(chalk.green(` - ${entry.path}`)));
-                console.log(chalk.yellow("File are ready to be commit."));
             } else {
-                console.log(chalk.yellow("No files in the staged area."));
+                console.log(chalk.yellow("No files in the staging area."));
             }
-            
+
             if (unstagedFiles.length > 0) {
                 console.log(chalk.blue("\nUnstaged files:"));
                 unstagedFiles.forEach(file => console.log(chalk.red(` - ${file}`)));
             } else {
                 console.log(chalk.yellow("\nNo unstaged files."));
             }
-            
+
             console.log("Use 'groot commit <message>' to save your changes.");
         } catch (error) {
             console.error(chalk.red("Error reading files:"), error.message);
         }
     }
-    
-    
+
+    async restore(filePath) {
+        try {
+            let index = JSON.parse(await fs.readFile(this.indexPath, { encoding: 'utf-8' }));
+            const fileEntry = index.find(entry => entry.path === filePath);
+
+            if (!fileEntry) {
+                console.log(chalk.red(`Error: File ${filePath} is not tracked in groot.`));
+                return;
+            }
+
+            const objectPath = path.join(this.objectsPath, fileEntry.hash);
+            const fileContent = await fs.readFile(objectPath, { encoding: 'utf-8' });
+            await fs.writeFile(filePath, fileContent);
+            console.log(chalk.green(`Restored ${filePath} from groot.`));
+        } catch (error) {
+            console.log(chalk.red("Error restoring file:"), error.message);
+        }
+    }
 
     async log() {
         let currentCommitHash = await this.getCurrentHead();
@@ -119,15 +135,16 @@ class Groot {
     }
 
     async getCommitDiff(commitHash) {
+        console.log(chalk.blue(`\nShowing commit: ${commitHash}\n`));
         const commitData = JSON.parse(await this.getCommitData(commitHash));
         if (!commitData) {
-            console.log("Commit not found");
+            console.log(chalk.red("Commit not found"));
             return;
         }
-        console.log("Changes in the last commit:");
 
+        console.log(chalk.green("Changes in this commit:"));
         for (const file of commitData.files) {
-            console.log(`File: ${file.path}`);
+            console.log(chalk.yellow(`\nFile: ${file.path}`));
             const fileContent = await this.getFileContent(file.hash);
             console.log(fileContent);
 
@@ -136,27 +153,24 @@ class Groot {
                 const getParentFileContent = await this.getParentFileContent(parentCommitData, file.path);
 
                 if (getParentFileContent !== undefined) {
-                    console.log('\nDiff:');
+                    console.log(chalk.blue('\nDiff:'));
                     const diff = diffLines(getParentFileContent, fileContent);
 
                     diff.forEach(part => {
                         if (part.added) {
-                            console.log("new line");
-                            
-                            process.stdout.write(chalk.green("++"+part.value+"\n"));
+                            process.stdout.write(chalk.green("New Lines++\n " + part.value + "\n"));
                         } else if (part.removed) {
-                            console.log("removed line");
-                            process.stdout.write(chalk.red("--"+part.value+"\n"));
+                            process.stdout.write(chalk.red("Removed Line--\n" + part.value + "\n"));
                         } else {
                             process.stdout.write(chalk.grey(part.value));
                         }
                     });
                     console.log();
                 } else {
-                    console.log('New file in the commit');
+                    console.log(chalk.yellow('New file in the commit'));
                 }
             } else {
-                console.log('First commit');
+                console.log(chalk.yellow('First commit'));
             }
         }
     }
@@ -184,46 +198,40 @@ class Groot {
     }
 }
 
-// (async () => {
-//     const groot = new Groot();
-//     // await groot.init();
-//     // await groot.add('a.txt');
-    
-//     // await groot.commit('3rd commit');
-//     // await groot.log();
-
-//     await groot.getCommitDiff('c5706881151731e12f57ecf072642dd4231e295d');
-// })();
-
-
+// CLI Commands
 program.command('init').action(async () => {
     const groot = new Groot();
     await groot.init();
 });
 
-program.command('add <file>').action(async (file)=>{
+program.command('add <file>').action(async (file) => {
     const groot = new Groot();
     await groot.add(file);
-})
+});
 
-program.command('commit <message>').action(async (message)=>{
+program.command('commit <message>').action(async (message) => {
     const groot = new Groot();
     await groot.commit(message);
-})
+});
 
-program.command('log').action(async ()=>{
+program.command('log').action(async () => {
     const groot = new Groot();
     await groot.log();
 });
 
-program.command('show <commitHash>').action(async (commitHash)=>{
+program.command('show <commitHash>').action(async (commitHash) => {
     const groot = new Groot();
     await groot.getCommitDiff(commitHash);
 });
 
-program.command('status').action(async ()=>{
+program.command('status').action(async () => {
     const groot = new Groot();
     await groot.status();
 });
+
+program.command('restore <file>').action(async (file) => {
+    const groot = new Groot();
+    await groot.restore(file);
+});
+
 program.parse(process.argv);
-// console.log(process.argv);
