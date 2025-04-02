@@ -77,6 +77,37 @@ class Groot {
         }
     }
 
+    async status() {
+        try {
+            const stagedFiles = JSON.parse(await fs.readFile(this.indexPath, { encoding: 'utf-8' }));
+            const allFiles = await fs.readdir(process.cwd()); // Fix: Use process.cwd() instead of this.workingDirectory
+            
+            const stagedPaths = new Set(stagedFiles.map(entry => entry.path));
+            const unstagedFiles = allFiles.filter(file => !stagedPaths.has(file));
+            
+            if (stagedFiles.length > 0) {
+                console.log(chalk.blue("Staged files:"));
+                stagedFiles.forEach(entry => console.log(chalk.green(` - ${entry.path}`)));
+                console.log(chalk.yellow("File are ready to be commit."));
+            } else {
+                console.log(chalk.yellow("No files in the staged area."));
+            }
+            
+            if (unstagedFiles.length > 0) {
+                console.log(chalk.blue("\nUnstaged files:"));
+                unstagedFiles.forEach(file => console.log(chalk.red(` - ${file}`)));
+            } else {
+                console.log(chalk.yellow("\nNo unstaged files."));
+            }
+            
+            console.log("Use 'groot commit <message>' to save your changes.");
+        } catch (error) {
+            console.error(chalk.red("Error reading files:"), error.message);
+        }
+    }
+    
+    
+
     async log() {
         let currentCommitHash = await this.getCurrentHead();
         while (currentCommitHash) {
@@ -190,5 +221,9 @@ program.command('show <commitHash>').action(async (commitHash)=>{
     await groot.getCommitDiff(commitHash);
 });
 
+program.command('status').action(async ()=>{
+    const groot = new Groot();
+    await groot.status();
+});
 program.parse(process.argv);
 // console.log(process.argv);
