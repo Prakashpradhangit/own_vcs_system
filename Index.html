@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Commit History Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .commit {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .commit:hover {
+            background: #f9f9f9;
+        }
+        .commit-details {
+            display: none;
+            padding: 10px;
+            background: #f8f8f8;
+            border-left: 3px solid #007bff;
+            margin-top: 5px;
+            border-radius: 5px;
+        }
+        .commit-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        .commit-message {
+            font-style: italic;
+            color: #555;
+        }
+        .file-list {
+            margin-top: 10px;
+            padding-left: 20px;
+        }
+        .file-item {
+            padding: 5px;
+            background: #eee;
+            margin: 5px 0;
+            border-radius: 3px;
+        }
+        .toggle-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            color: #007bff;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Commit History</h2>
+        <div id="commitList">Loading commits...</div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            fetch("http://localhost:3000/get-json-files")
+                .then(response => response.json())
+                .then(filesData => {
+                    const commitList = document.getElementById("commitList");
+                    commitList.innerHTML = ""; // Clear loading text
+
+                    filesData.forEach(file => {
+                        file.data.forEach(commit => {
+                            const commitElement = document.createElement("div");
+                            commitElement.classList.add("commit");
+
+                            const title = document.createElement("div");
+                            title.classList.add("commit-title");
+                            title.innerHTML = `🔗 Commit: <strong>${commit.commitHash.substring(0, 8)}</strong>`;
+
+                            const message = document.createElement("div");
+                            message.classList.add("commit-message");
+                            message.textContent = `"${commit.message}" - ${new Date(commit.timeStamp).toLocaleString()}`;
+
+                            const toggleBtn = document.createElement("button");
+                            toggleBtn.classList.add("toggle-btn");
+                            toggleBtn.textContent = "View Details";
+
+                            const commitDetails = document.createElement("div");
+                            commitDetails.classList.add("commit-details");
+
+                            const fileList = document.createElement("div");
+                            fileList.classList.add("file-list");
+
+                            commit.files.forEach(file => {
+                                const fileItem = document.createElement("div");
+                                fileItem.classList.add("file-item");
+                                fileItem.textContent = `📄 ${file.path} (hash: ${file.hash.substring(0, 8)})`;
+                                fileList.appendChild(fileItem);
+                            });
+
+                            commitDetails.appendChild(fileList);
+
+                            toggleBtn.addEventListener("click", function () {
+                                if (commitDetails.style.display === "none") {
+                                    commitDetails.style.display = "block";
+                                    toggleBtn.textContent = "Hide Details";
+                                } else {
+                                    commitDetails.style.display = "none";
+                                    toggleBtn.textContent = "View Details";
+                                }
+                            });
+
+                            commitElement.appendChild(title);
+                            commitElement.appendChild(message);
+                            commitElement.appendChild(toggleBtn);
+                            commitElement.appendChild(commitDetails);
+                            commitList.appendChild(commitElement);
+                        });
+                    });
+                })
+                .catch(error => {
+                    console.error("Error fetching JSON data:", error);
+                    document.getElementById("commitList").innerHTML = "Failed to load commit data.";
+                });
+        });
+    </script>
+</body>
+</html>

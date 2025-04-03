@@ -15,6 +15,7 @@ class Groot {
         this.objectsPath = path.join(this.repoPath, 'objects');
         this.headPath = path.join(this.repoPath, 'HEAD');
         this.indexPath = path.join(this.repoPath, 'index');
+        this.commitsJsonPath = path.join(this.repoPath, 'commits.json');
     }
 
     async init() {
@@ -24,6 +25,7 @@ class Groot {
         try {
             await fs.writeFile(this.headPath, '', { flag: 'wx' });
             await fs.writeFile(this.indexPath, JSON.stringify([]), { flag: 'wx' });
+            await fs.writeFile(this.commitsJsonPath, JSON.stringify([]), { flag: 'wx' });
         } catch (error) {
             console.log('Already initialized the .groot folder');
         }
@@ -47,34 +49,6 @@ class Groot {
         index = index.filter(entry => entry.path !== filePath);
         index.push({ path: filePath, hash: fileHash });
         await fs.writeFile(this.indexPath, JSON.stringify(index));
-    }
-
-    async commit(message) {
-        const index = JSON.parse(await fs.readFile(this.indexPath, { encoding: 'utf-8' }));
-        const parentCommit = await this.getCurrentHead();
-
-        const commitData = {
-            timeStamp: new Date().toISOString(),
-            message,
-            files: index,
-            parent: parentCommit
-        };
-
-        const commitHash = this.hashObject(JSON.stringify(commitData));
-        const commitPath = path.join(this.objectsPath, commitHash);
-        await fs.writeFile(commitPath, JSON.stringify(commitData));
-        await fs.writeFile(this.headPath, commitHash);
-        await fs.writeFile(this.indexPath, JSON.stringify([]));
-        console.log(`Commit successfully created: ${commitHash}`);
-    }
-
-    async getCurrentHead() {
-        try {
-            const head = await fs.readFile(this.headPath, { encoding: 'utf-8' });
-            return head.trim() || null;
-        } catch (error) {
-            return null;
-        }
     }
 
     async status() {
@@ -124,14 +98,85 @@ class Groot {
         }
     }
 
-    async log() {
-        let currentCommitHash = await this.getCurrentHead();
-        while (currentCommitHash) {
-            const commitData = JSON.parse(await fs.readFile(path.join(this.objectsPath, currentCommitHash), { encoding: 'utf-8' }));
-            console.log('------------------------------------');
-            console.log(`commit: ${currentCommitHash}\nDate: ${commitData.timeStamp}\n\n\t${commitData.message}\n`);
-            currentCommitHash = commitData.parent;
+    async commit(message) {
+        const index = JSON.parse(await fs.readFile(this.indexPath, { encoding: 'utf-8' }));
+        const parentCommit = await this.getCurrentHead();
+
+        const commitData = {
+            commitHash: this.hashObject(JSON.stringify({ index, message, parentCommit })),
+            timeStamp: new Date().toISOString(),
+            message,
+            files: index,
+            parent: parentCommit
+        };
+
+        const commitPath = path.join(this.objectsPath, commitData.commitHash);
+        await fs.writeFile(commitPath, JSON.stringify(commitData));
+        await fs.writeFile(this.headPath, commitData.commitHash);
+        await fs.writeFile(this.indexPath, JSON.stringify([]));
+
+        await this.saveCommitToJson(commitData);
+
+        console.log(`Commit successfully created: ${commitData.commitHash}`);
+    }
+
+    async saveCommitToJson(commitData) {
+        let commits = [];
+        try {
+            const existingCommits = await fs.readFile(this.commitsJsonPath, { encoding: 'utf-8' });
+            commits = JSON.parse(existingCommits);
+        } catch (error) {}
+
+        commits.push(commitData);
+        await fs.writeFile(this.commitsJsonPath, JSON.stringify(commits, null, 2));
+    }
+
+    async getCurrentHead() {
+        try {
+            const head = await fs.readFile(this.headPath, { encoding: 'utf-8' });
+            return head.trim() || null;
+        } catch (error) {
+            return null;
         }
+    }
+
+    async log() {
+        try {
+            const commits = JSON.parse(await fs.readFile(this.commitsJsonPath, { encoding: 'utf-8' }));
+
+            if (commits.length === 0) {
+                console.log(chalk.yellow("No commits found."));
+                return;
+            }
+
+            commits.reverse().forEach(commit => {
+                console.log('------------------------------------');
+                console.log(`Message: ${commit.message}`);
+                console.log(`Commit files: ${commit.files.map(file => file.path).join(', ')}`);        
+                console.log(`Commit: ${commit.commitHash}`);
+                console.log(`Date: ${commit.timeStamp}`);
+                console.log(`Parent: ${commit.parent || "None"}`);
+                console.log('------------------------------------\n');
+            });
+
+        } catch (error) {
+            console.log(chalk.red("Error reading commit history"), error.message);
+        }
+    }
+
+    async getCommitData(commitHash) {
+        const commitPath = path.join(this.objectsPath, commitHash);
+        try {
+            return await fs.readFile(commitPath, { encoding: 'utf-8' });
+        } catch (error) {
+            console.log("Failed to get commit data");
+            return null;
+        }
+    }
+
+    async getFileContent(fileHash) {
+        const objectPath = path.join(this.objectsPath, fileHash);
+        return await fs.readFile(objectPath, { encoding: 'utf-8' });
     }
 
     async getCommitDiff(commitHash) {
@@ -181,21 +226,6 @@ class Groot {
             return await this.getFileContent(parentFile.hash);
         }
     }
-
-    async getCommitData(commitHash) {
-        const commitPath = path.join(this.objectsPath, commitHash);
-        try {
-            return await fs.readFile(commitPath, { encoding: 'utf-8' });
-        } catch (error) {
-            console.log("Failed to get commit data");
-            return null;
-        }
-    }
-
-    async getFileContent(fileHash) {
-        const objectPath = path.join(this.objectsPath, fileHash);
-        return await fs.readFile(objectPath, { encoding: 'utf-8' });
-    }
 }
 
 // CLI Commands
@@ -219,11 +249,6 @@ program.command('log').action(async () => {
     await groot.log();
 });
 
-program.command('show <commitHash>').action(async (commitHash) => {
-    const groot = new Groot();
-    await groot.getCommitDiff(commitHash);
-});
-
 program.command('status').action(async () => {
     const groot = new Groot();
     await groot.status();
@@ -232,6 +257,11 @@ program.command('status').action(async () => {
 program.command('restore <file>').action(async (file) => {
     const groot = new Groot();
     await groot.restore(file);
+});
+
+program.command('show <commitHash>').action(async (commitHash) => {
+    const groot = new Groot();
+    await groot.getCommitDiff(commitHash);
 });
 
 program.parse(process.argv);
