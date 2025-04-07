@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>User Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Fira Code', monospace;
+    }
+
+    body {
+      background-color: #f5f5f5;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .container {
+      display: flex;
+      flex: 1;
+    }
+
+    .sidebar {
+      width: 250px;
+      background-color: #222;
+      color: #fff;
+      padding: 30px 20px;
+      min-height: 100vh;
+    }
+
+    .sidebar h2 {
+      margin-bottom: 30px;
+    }
+
+    .sidebar nav a {
+      display: block;
+      color: #bbb;
+      text-decoration: none;
+      margin: 15px 0;
+      font-size: 16px;
+      transition: color 0.3s ease;
+    }
+
+    .sidebar nav a:hover {
+      color: #fff;
+    }
+
+    .main {
+      flex: 1;
+      padding: 40px;
+      overflow-y: auto;
+    }
+
+    .user-info h1 {
+      font-size: 28px;
+      color: #444;
+    }
+
+    .user-info p {
+      font-size: 16px;
+      color: #777;
+    }
+
+    .commit-history h2 {
+      font-size: 24px;
+      margin-bottom: 15px;
+      color: #333;
+    }
+
+    #commitLog {
+      list-style: none;
+    }
+
+    .commit-item {
+      background: #fff;
+      border-left: 4px solid #667eea;
+      margin-bottom: 15px;
+      padding: 15px 20px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      border-radius: 6px;
+    }
+
+    .commit-item strong {
+      color: #222;
+    }
+
+    .commit-item small {
+      color: #888;
+      display: block;
+      margin-top: 5px;
+    }
+
+    .logout-btn {
+      margin-top: 50px;
+      display: inline-block;
+      background: #ff4d4d;
+      color: #fff;
+      padding: 10px 15px;
+      text-decoration: none;
+      border-radius: 5px;
+      transition: background 0.3s;
+      cursor: pointer;
+    }
+
+    .logout-btn:hover {
+      background: #e60000;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+        padding: 20px;
+        min-height: auto;
+      }
+
+      .main {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="sidebar">
+      <h2>Version Control Sysytem</h2>
+      <nav>
+        <a href="#">Dashboard</a>
+        <a href="/Index.html">Commits</a>
+        <a href="#">Files</a>
+        <a href="#">Settings</a>
+      </nav>
+      <a class="logout-btn" id="logoutBtn">Logout</a>
+    </div>
+
+    <div class="main">
+      <div class="user-info">
+        <h1>Welcome, <span id="username">Loading...</span></h1>
+        <p>Email: <span id="email">Loading...</span></p>
+      </div>
+
+      <div class="commit-history">
+        <h2>Commit History</h2>
+        <ul id="commitLog">
+          <!-- JavaScript populates this -->
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Load user from localStorage
+    const user = JSON.parse(localStorage.getItem("user"));
+    if (!user) {
+      window.location.href = "/login.html";
+    } else {
+      document.getElementById("username").textContent = user.username || "User";
+      document.getElementById("email").textContent = user.email || "N/A";
+    }
+
+    // Logout functionality
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      localStorage.removeItem("user");
+      window.location.href = "/login.html";
+    });
+
+    // Fetch commit logs
+    fetch("http://localhost:3000/commits")
+      .then(res => res.json())
+      .then(commits => {
+        const log = document.getElementById("commitLog");
+        if (!commits.length) {
+          log.innerHTML = "<li>No commits available.</li>";
+          return;
+        }
+
+        commits.forEach(commit => {
+          const li = document.createElement("li");
+          li.className = "commit-item";
+          li.innerHTML = `
+            <strong>${commit.commitHash?.slice(0, 7) || "NoHash"}</strong> - ${commit.message || "No message"}
+            <small>${new Date(commit.timeStamp).toLocaleString()}</small>
+          `;
+          log.appendChild(li);
+        });
+      })
+      .catch(() => {
+        document.getElementById("commitLog").innerHTML = "<li>Error loading commits.</li>";
+      });
+  </script>
+</body>
+</html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Signup Page</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<style>
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .signup-container {
+    background-color: #fff;
+    padding: 35px 45px;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  }
+
+  .signup-container h2 {
+    margin-bottom: 25px;
+    color: #333;
+    text-align: center;
+  }
+
+  .input-group {
+    margin-bottom: 20px;
+  }
+
+  .input-group label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: #555;
+  }
+
+  .input-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    transition: 0.3s;
+  }
+
+  .input-group input:focus {
+    border-color: #667eea;
+    outline: none;
+  }
+
+  button {
+    width: 100%;
+    padding: 12px;
+    background-color: #667eea;
+    color: #fff;
+    font-size: 16px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+
+  button:hover {
+    background-color: #5a67d8;
+  }
+
+  .login-link {
+    margin-top: 15px;
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .login-link a {
+    color: #667eea;
+    text-decoration: none;
+  }
+
+  .login-link a:hover {
+    text-decoration: underline;
+  }
+</style>
+
+<body>
+  <div class="signup-container">
+    <h2>Create Your Account</h2>
+    <form id="signupForm">
+      <div class="input-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" required />
+      </div>
+
+      <div class="input-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required />
+      </div>
+
+      <div class="input-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required />
+      </div>
+
+      <button type="submit">Sign Up</button>
+      <p class="login-link">Already registered? <a href="/login.html">Login here</a></p>
+    </form>
+  </div>
+
+  <script>
+    document.getElementById("signupForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData(e.target);
+      const data = {
+        username: formData.get("username"),
+        email: formData.get("email"),
+        password: formData.get("password"),
+      };
+
+      const response = await fetch("http://localhost:3000/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+      alert(result.message);
+
+      if (result.message === "Signup successful!") {
+        window.location.href = "/login.html";
+      }
+    });
+  </script>
+</body>
+</html>
