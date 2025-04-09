@@ -72,7 +72,7 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            fetch("http://localhost:3000/get-json-files")
+            fetch("http://localhost:3001/get-json-files")
                 .then(response => response.json())
                 .then(filesData => {
                     const commitList = document.getElementById("commitList");

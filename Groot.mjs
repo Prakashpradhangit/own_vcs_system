@@ -181,41 +181,72 @@ class Groot {
 
     async getCommitDiff(commitHash) {
         console.log(chalk.blue(`\nShowing commit: ${commitHash}\n`));
-        const commitData = JSON.parse(await this.getCommitData(commitHash));
-        if (!commitData) {
-            console.log(chalk.red("Commit not found"));
+    
+        const rawCommitData = await this.getCommitData(commitHash);
+        if (!rawCommitData) {
+            console.log(chalk.red("❌ Commit not found"));
             return;
         }
-
-        console.log(chalk.green("Changes in this commit:"));
+    
+        let commitData;
+        try {
+            commitData = JSON.parse(rawCommitData);
+        } catch (err) {
+            console.log(chalk.red("❌ Failed to parse commit data"));
+            return;
+        }
+    
+        if (!commitData.files || !Array.isArray(commitData.files)) {
+            console.log(chalk.red("❌ No files found in commit"));
+            return;
+        }
+    
+        console.log(chalk.green("✅ Changes in this commit:"));
         for (const file of commitData.files) {
-            console.log(chalk.yellow(`\nFile: ${file.path}`));
+            console.log(chalk.yellow(`\n📄 File: ${file.path}`));
+    
             const fileContent = await this.getFileContent(file.hash);
-            console.log(fileContent);
-
+            if (fileContent === undefined) {
+                console.log(chalk.red("❌ Failed to read current file content"));
+                continue;
+            }
+            console.log(chalk.white("🔍 Current Version:\n") + fileContent);
+    
             if (commitData.parent) {
-                const parentCommitData = JSON.parse(await this.getCommitData(commitData.parent));
+                const rawParentCommitData = await this.getCommitData(commitData.parent);
+                if (!rawParentCommitData) {
+                    console.log(chalk.yellow('⚠️ Parent commit not found'));
+                    continue;
+                }
+    
+                let parentCommitData;
+                try {
+                    parentCommitData = JSON.parse(rawParentCommitData);
+                } catch (err) {
+                    console.log(chalk.red("❌ Failed to parse parent commit data"));
+                    continue;
+                }
+    
                 const getParentFileContent = await this.getParentFileContent(parentCommitData, file.path);
-
                 if (getParentFileContent !== undefined) {
-                    console.log(chalk.blue('\nDiff:'));
+                    console.log(chalk.cyan('\n📊 Diff:'));
+    
                     const diff = diffLines(getParentFileContent, fileContent);
-
                     diff.forEach(part => {
                         if (part.added) {
-                            process.stdout.write(chalk.green("New Lines++\n " + part.value + "\n"));
+                            process.stdout.write(chalk.green("➕ " + part.value));
                         } else if (part.removed) {
-                            process.stdout.write(chalk.red("Removed Line--\n" + part.value + "\n"));
+                            process.stdout.write(chalk.red("➖ " + part.value));
                         } else {
-                            process.stdout.write(chalk.grey(part.value));
+                            process.stdout.write(chalk.gray(part.value));
                         }
                     });
                     console.log();
                 } else {
-                    console.log(chalk.yellow('New file in the commit'));
+                    console.log(chalk.yellow('🆕 New file added in this commit'));
                 }
             } else {
-                console.log(chalk.yellow('First commit'));
+                console.log(chalk.yellow('🟢 First commit – no diff'));
             }
         }
     }
