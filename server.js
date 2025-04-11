@@ -6,35 +6,31 @@ const cors = require("cors");
 const app = express();
 const PORT = 3001;
 
-// Enable CORS for frontend requests
 app.use(cors());
-app.use(express.static("public")); // Serves the frontend
+app.use(express.static("public")); // Serves frontend static files
 
-// Directory containing JSON files
-const JSON_DIR = path.join(__dirname, ".groot");
+// Path to the bundled groot-data.json
+const GROOT_DATA_FILE = path.join(__dirname, ".groot-remote", "groot-data.json");
 
-// Endpoint to get all JSON files dynamically
-app.get("/get-json-files", (req, res) => {
-    fs.readdir(JSON_DIR, (err, files) => {
+// Endpoint to get full groot data
+app.get("/get-groot-data", (req, res) => {
+    fs.readFile(GROOT_DATA_FILE, "utf8", (err, data) => {
         if (err) {
-            return res.status(500).json({ error: "Error reading directory" });
+            console.error("Error reading groot-data.json:", err);
+            return res.status(500).json({ error: "Failed to read groot-data.json" });
         }
 
-        // Filter JSON files
-        const jsonFiles = files.filter(file => file.endsWith(".json"));
-
-        // Read each JSON file and collect data
-        let jsonDataArray = [];
-        jsonFiles.forEach(file => {
-            let fileData = fs.readFileSync(path.join(JSON_DIR, file), "utf8");
-            jsonDataArray.push({ filename: file, data: JSON.parse(fileData) });
-        });
-
-        res.json(jsonDataArray);
+        try {
+            const grootData = JSON.parse(data);
+            res.json(grootData);
+        } catch (parseErr) {
+            console.error("Error parsing groot-data.json:", parseErr);
+            res.status(500).json({ error: "Invalid JSON format in groot-data.json" });
+        }
     });
 });
 
 // Start the server
 app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
+    console.log(`🚀 Server running at http://localhost:${PORT}`);
 });

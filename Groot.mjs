@@ -36,13 +36,29 @@ class Groot {
     }
 
     async add(fileToBeAdded) {
-        const filedata = await fs.readFile(fileToBeAdded, { encoding: 'utf-8' });
-        const fileHash = this.hashObject(filedata);
-        const newFileHashedObjectPath = path.join(this.objectsPath, fileHash);
-        await fs.writeFile(newFileHashedObjectPath, filedata);
-        await this.updateStagingArea(fileToBeAdded, fileHash);
-        console.log(`Added ${fileToBeAdded} to the index`);
+        try {
+            const fullPath = path.resolve(fileToBeAdded);
+            const stat = await fs.stat(fullPath);
+    
+            if (stat.isDirectory()) {
+                console.log(chalk.red(`❌ Cannot add a directory: ${fileToBeAdded}`));
+                return;
+            }
+    
+            const filedata = await fs.readFile(fullPath, { encoding: 'utf-8' });
+            const fileHash = this.hashObject(filedata);
+            const newFileHashedObjectPath = path.join(this.objectsPath, fileHash);
+    
+            await fs.writeFile(newFileHashedObjectPath, filedata);
+            await this.updateStagingArea(fileToBeAdded, fileHash);
+    
+            console.log(chalk.green(`✅ Added ${fileToBeAdded} to the index`));
+        } catch (error) {
+            console.log(chalk.red(`❌ Failed to add file: ${fileToBeAdded}`));
+            console.log(chalk.red(error.message));
+        }
     }
+    
 
     async updateStagingArea(filePath, fileHash) {
         let index = JSON.parse(await fs.readFile(this.indexPath, { encoding: 'utf-8' }));
@@ -180,7 +196,7 @@ class Groot {
     }
 
     async getCommitDiff(commitHash) {
-        console.log(chalk.blue(`\nShowing commit: ${commitHash}\n`));
+        console.log(chalk.blue(`\n🔍 Showing commit: ${commitHash}\n`));
     
         const rawCommitData = await this.getCommitData(commitHash);
         if (!rawCommitData) {
@@ -202,20 +218,22 @@ class Groot {
         }
     
         console.log(chalk.green("✅ Changes in this commit:"));
+    
         for (const file of commitData.files) {
             console.log(chalk.yellow(`\n📄 File: ${file.path}`));
     
-            const fileContent = await this.getFileContent(file.hash);
-            if (fileContent === undefined) {
+            const currentContent = await this.getFileContent(file.hash);
+            if (currentContent === undefined) {
                 console.log(chalk.red("❌ Failed to read current file content"));
                 continue;
             }
-            console.log(chalk.white("🔍 Current Version:\n") + fileContent);
+    
+            console.log(chalk.white("📌 Current Version:\n") + currentContent);
     
             if (commitData.parent) {
                 const rawParentCommitData = await this.getCommitData(commitData.parent);
                 if (!rawParentCommitData) {
-                    console.log(chalk.yellow('⚠️ Parent commit not found'));
+                    console.log(chalk.yellow("⚠️ Parent commit not found"));
                     continue;
                 }
     
@@ -227,26 +245,34 @@ class Groot {
                     continue;
                 }
     
-                const getParentFileContent = await this.getParentFileContent(parentCommitData, file.path);
-                if (getParentFileContent !== undefined) {
-                    console.log(chalk.cyan('\n📊 Diff:'));
+                const parentFile = parentCommitData.files.find(f => f.path === file.path);
+                if (parentFile) {
+                    const parentContent = await this.getFileContent(parentFile.hash);
+                    if (parentContent !== undefined) {
+                        console.log(chalk.cyan("\n📊 Diff:"));
     
-                    const diff = diffLines(getParentFileContent, fileContent);
-                    diff.forEach(part => {
-                        if (part.added) {
-                            process.stdout.write(chalk.green("➕ " + part.value));
-                        } else if (part.removed) {
-                            process.stdout.write(chalk.red("➖ " + part.value));
-                        } else {
-                            process.stdout.write(chalk.gray(part.value));
-                        }
-                    });
-                    console.log();
+                        const diff = diffLines(parentContent, currentContent);
+                        diff.forEach(part => {
+                            const lines = part.value.split("\n");
+                            lines.forEach(line => {
+                                if (line === "") return;
+                                if (part.added) {
+                                    console.log(chalk.green(`➕ ${line}`));
+                                } else if (part.removed) {
+                                    console.log(chalk.red(`➖ ${line}`));
+                                } else {
+                                    console.log(chalk.gray(`  ${line}`));
+                                }
+                            });
+                        });
+                    } else {
+                        console.log(chalk.red("❌ Failed to read parent file content"));
+                    }
                 } else {
-                    console.log(chalk.yellow('🆕 New file added in this commit'));
+                    console.log(chalk.yellow("🆕 New file added in this commit"));
                 }
             } else {
-                console.log(chalk.yellow('🟢 First commit – no diff'));
+                console.log(chalk.yellow("🟢 First commit – no parent to compare"));
             }
         }
     }
@@ -257,6 +283,56 @@ class Groot {
             return await this.getFileContent(parentFile.hash);
         }
     }
+
+    async push() {
+        try {
+            const remoteRepoPath = path.join(this.repoPath, '..', '.groot-remote');
+            const remoteObjectsPath = path.join(remoteRepoPath, 'objects');
+            const remoteDataJsonPath = path.join(remoteRepoPath, 'groot-data.json');
+    
+            await fs.mkdir(remoteObjectsPath, { recursive: true });
+    
+            // Read local HEAD and commits
+            const head = await fs.readFile(this.headPath, 'utf-8');
+            const commitsJson = await fs.readFile(this.commitsJsonPath, 'utf-8');
+            const commits = JSON.parse(commitsJson);
+    
+            // Copy all object files to remote
+            const objectFiles = await fs.readdir(this.objectsPath);
+            for (const file of objectFiles) {
+                const src = path.join(this.objectsPath, file);
+                const dest = path.join(remoteObjectsPath, file);
+                await fs.copyFile(src, dest);
+            }
+    
+            // Collect file content by path
+            const fileContents = {};
+            for (const commit of commits) {
+                for (const file of commit.files) {
+                    if (!fileContents[file.path]) {
+                        const content = await this.getFileContent(file.hash);
+                        fileContents[file.path] = content;
+                    }
+                }
+            }
+    
+            // Save all data into groot-data.json
+            const bundledData = {
+                HEAD: head.trim(),
+                commits,
+                files: fileContents
+            };
+            await fs.writeFile(remoteDataJsonPath, JSON.stringify(bundledData, null, 2));
+    
+            console.log(chalk.green('🚀 Push successful: Data saved to .groot-remote/groot-data.json and objects copied.'));
+        } catch (error) {
+            console.log(chalk.red('❌ Push failed:'), error.message);
+        }
+    }
+    
+    
+    
+    
 }
 
 // CLI Commands
@@ -294,5 +370,11 @@ program.command('show <commitHash>').action(async (commitHash) => {
     const groot = new Groot();
     await groot.getCommitDiff(commitHash);
 });
+
+program.command('push').action(async () => {
+    const groot = new Groot();
+    await groot.push();
+});
+
 
 program.parse(process.argv);
