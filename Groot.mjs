@@ -117,24 +117,25 @@ class Groot {
     async commit(message) {
         const index = JSON.parse(await fs.readFile(this.indexPath, { encoding: 'utf-8' }));
         const parentCommit = await this.getCurrentHead();
-
+    
         const commitData = {
             commitHash: this.hashObject(JSON.stringify({ index, message, parentCommit })),
-            timeStamp: new Date().toISOString(),
+            timeStamp: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }), // ← fixed for IST
             message,
             files: index,
             parent: parentCommit
         };
-
+    
         const commitPath = path.join(this.objectsPath, commitData.commitHash);
         await fs.writeFile(commitPath, JSON.stringify(commitData));
         await fs.writeFile(this.headPath, commitData.commitHash);
         await fs.writeFile(this.indexPath, JSON.stringify([]));
-
+    
         await this.saveCommitToJson(commitData);
-
+    
         console.log(`Commit successfully created: ${commitData.commitHash}`);
     }
+    
 
     async saveCommitToJson(commitData) {
         let commits = [];
@@ -292,12 +293,10 @@ class Groot {
     
             await fs.mkdir(remoteObjectsPath, { recursive: true });
     
-            // Read local HEAD and commits
             const head = await fs.readFile(this.headPath, 'utf-8');
             const commitsJson = await fs.readFile(this.commitsJsonPath, 'utf-8');
             const commits = JSON.parse(commitsJson);
     
-            // Copy all object files to remote
             const objectFiles = await fs.readdir(this.objectsPath);
             for (const file of objectFiles) {
                 const src = path.join(this.objectsPath, file);
@@ -305,32 +304,34 @@ class Groot {
                 await fs.copyFile(src, dest);
             }
     
-            // Collect file content by path
-            const fileContents = {};
+            // Map: fileHash -> { path, content }
+            const allFileContents = {};
+    
             for (const commit of commits) {
                 for (const file of commit.files) {
-                    if (!fileContents[file.path]) {
+                    if (!allFileContents[file.hash]) {
                         const content = await this.getFileContent(file.hash);
-                        fileContents[file.path] = content;
+                        allFileContents[file.hash] = {
+                            path: file.path,
+                            content
+                        };
                     }
                 }
             }
     
-            // Save all data into groot-data.json
             const bundledData = {
                 HEAD: head.trim(),
                 commits,
-                files: fileContents
+                files: allFileContents // 🔥 Now all file versions are preserved!
             };
+    
             await fs.writeFile(remoteDataJsonPath, JSON.stringify(bundledData, null, 2));
     
-            console.log(chalk.green('🚀 Push successful: Data saved to .groot-remote/groot-data.json and objects copied.'));
+            console.log(chalk.green('🚀 Push successful: Full data (commits + file versions) saved to .groot-remote/groot-data.json'));
         } catch (error) {
             console.log(chalk.red('❌ Push failed:'), error.message);
         }
     }
-    
-    
     
     
 }
@@ -346,7 +347,7 @@ program.command('add <file>').action(async (file) => {
     await groot.add(file);
 });
 
-program.command('commit <message>').action(async (message) => {
+program.command('commit  <message>').action(async (message) => {
     const groot = new Groot();
     await groot.commit(message);
 });

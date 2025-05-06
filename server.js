@@ -16,7 +16,7 @@ const GROOT_DATA_FILE = path.join(__dirname, ".groot-remote", "groot-data.json")
 app.get("/get-groot-data", (req, res) => {
     fs.readFile(GROOT_DATA_FILE, "utf8", (err, data) => {
         if (err) {
-            console.error("Error reading groot-data.json:", err);
+            console.error("Error reading groot-data.json:", err);     
             return res.status(500).json({ error: "Failed to read groot-data.json" });
         }
 
