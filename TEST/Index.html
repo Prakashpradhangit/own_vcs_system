@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Groot Commit History Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: rgb(234, 231, 231);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .commit {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            cursor: pointer;
+        }
+        .commit-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        .commit-message {
+            font-style: italic;
+            color: #555;
+        }
+        .commit-details {
+            margin-top: 10px;
+            background: #f9f9f9;
+            padding: 10px;
+            border-left: 4px solid #007bff;
+            border-radius: 6px;
+        }
+        .file-item {
+            background: #eee;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+        .file-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .file-content {
+            display: none;
+            background: #fff;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .toggle-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #007bff;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>📜 Groot Commit History</h2>
+        <div id="commitList">Loading commits...</div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            fetch("http://localhost:3001/get-groot-data")
+                .then(response => response.json())
+                .then(data => {
+                    const { commits, files } = data;
+                    const commitList = document.getElementById("commitList");
+                    commitList.innerHTML = "";
+
+                    commits.forEach(commit => {
+                        const commitElement = document.createElement("div");
+                        commitElement.classList.add("commit");
+
+                        const title = document.createElement("div");
+                        title.classList.add("commit-title");
+                        title.innerHTML = `🔗 Commit: <strong>${commit.commitHash.substring(0, 8)}</strong>`;
+
+                        const message = document.createElement("div");
+                        message.classList.add("commit-message");
+                        message.textContent = `"${commit.message}" - ${new Date(commit.timeStamp).toLocaleString()}`;
+
+                        const details = document.createElement("div");
+                        details.classList.add("commit-details");
+
+                        commit.files.forEach(file => {
+                            const fileItem = document.createElement("div");
+                            fileItem.classList.add("file-item");
+
+                            const header = document.createElement("div");
+                            header.classList.add("file-header");
+
+                            const name = document.createElement("span");
+                            name.textContent = `📄 ${file.path} (hash: ${file.hash.substring(0, 8)})`;
+
+                            const toggleBtn = document.createElement("button");
+                            toggleBtn.classList.add("toggle-btn");
+                            toggleBtn.textContent = "Show Content";
+
+                            const content = document.createElement("div");
+                            content.classList.add("file-content");
+                            content.textContent = files[file.path] || "No content available";
+
+                            toggleBtn.addEventListener("click", () => {
+                                if (content.style.display === "none" || content.style.display === "") {
+                                    content.style.display = "block";
+                                    toggleBtn.textContent = "Hide Content";
+                                } else {
+                                    content.style.display = "none";
+                                    toggleBtn.textContent = "Show Content";
+                                }
+                            });
+
+                            header.appendChild(name);
+                            header.appendChild(toggleBtn);
+                            fileItem.appendChild(header);
+                            fileItem.appendChild(content);
+                            details.appendChild(fileItem);
+                        });
+
+                        commitElement.appendChild(title);
+                        commitElement.appendChild(message);
+                        commitElement.appendChild(details);
+                        commitList.appendChild(commitElement);
+                    });
+                })
+                .catch(err => {
+                    console.error("Error:", err);
+                    document.getElementById("commitList").innerHTML = "❌ Failed to load commit data.";
+                });
+        });
+    </script>
+</body>
+</html>

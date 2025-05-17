@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>User Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code&display=swap" rel="stylesheet">
   <style>
@@ -14,8 +15,8 @@
     }
 
     body {
-      background-color: #f5f5f5;
-      color: #333;
+      background-color: #9b9bc0;
+      color: #1e1e2f;
       display: flex;
       flex-direction: column;
       min-height: 100vh;
@@ -87,7 +88,7 @@
       border-left: 5px solid #7f9cf5;
       padding: 20px;
       border-radius: 10px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     }
 
     .stat-card h3 {
@@ -115,7 +116,7 @@
       border-left: 4px solid #667eea;
       margin-bottom: 15px;
       padding: 15px 20px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
       border-radius: 6px;
       transition: transform 0.2s;
     }
@@ -171,6 +172,7 @@
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <div class="sidebar">
@@ -209,47 +211,57 @@
   </div>
 
   <script>
+    // Check for user data in localStorage
     const user = JSON.parse(localStorage.getItem("user"));
     if (!user) {
-      window.location.href = "/login.html";
+      window.location.href = "/login.html"; // Redirect to login if no user is found
     } else {
       document.getElementById("username").textContent = user.username || "User";
       document.getElementById("email").textContent = user.email || "N/A";
     }
 
+    // Logout functionality
     document.getElementById("logoutBtn").addEventListener("click", () => {
-      localStorage.removeItem("user");
-      window.location.href = "/login.html";
+      localStorage.removeItem("user"); // Clear user data from localStorage
+      window.location.href = "/login.html"; // Redirect to login page
     });
 
-    fetch("http://localhost:3000/commits")
-      .then(res => res.json())
+    // Fetch commit logs and update commit statistics
+    fetch("http://localhost:3001/commits")  // Update to use the /commits endpoint
+      .then(res => res.json())  // Parse the JSON response
       .then(commits => {
         const log = document.getElementById("commitLog");
-        const total = document.getElementById("totalCommits");
-        const last = document.getElementById("lastCommit");
+        const totalCommits = document.getElementById("totalCommits");
+        const lastCommit = document.getElementById("lastCommit");
 
-        if (!commits.length) {
-          log.innerHTML = "<li>No commits available.</li>";
+        if (commits.length === 0) {
+          log.innerHTML = "<li>No commits available.</li>"; // If no commits, show message
           return;
         }
 
-        total.textContent = commits.length;
-        last.textContent = new Date(commits[commits.length - 1].timeStamp).toLocaleString();
+        // Update the total number of commits
+        totalCommits.textContent = commits.length;
 
+        // Update the last commit information
+        lastCommit.textContent = new Date(commits[commits.length - 1].timeStamp).toLocaleString();
+
+        // Loop through the commits and display them
         commits.reverse().forEach(commit => {
           const li = document.createElement("li");
           li.className = "commit-item";
           li.innerHTML = `
-            <strong>${commit.commitHash?.slice(0, 7) || "NoHash"}</strong> - ${commit.message || "No message"}
-            <small>${new Date(commit.timeStamp).toLocaleString()}</small>
-          `;
+        <strong>${commit.commitHash?.slice(0, 7) || "NoHash"}</strong> - ${commit.message || "No message"}
+        <small>${new Date(commit.timeStamp).toLocaleString()}</small>
+      `;
           log.appendChild(li);
         });
       })
       .catch(() => {
+        // Handle errors when fetching commit data
         document.getElementById("commitLog").innerHTML = "<li>Error loading commits.</li>";
       });
-  </script>
+</script>
+
 </body>
+
 </html>

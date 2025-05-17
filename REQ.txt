@@ -1,0 +1,9 @@
+chalk
+commander
+diff
+
+npm install
+
+npm init -y
+
+npm install chalk commander diff --save

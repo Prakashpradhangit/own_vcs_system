@@ -13,47 +13,95 @@
 
     html, body {
       height: 100%;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #121212;
-      color: #f0f0f0;
+      font-family: 'Fira Code', monospace;
+      background-color: #9b9bc0;
+      color: #f5f5f5;
+      display: flex;
+      flex-direction: column;
     }
 
     header {
       position: sticky;
       top: 0;
       width: 100%;
-      background: #1f1f1f;
+      background: #2c2c45;
       padding: 20px;
       text-align: center;
       font-size: 24px;
       font-weight: bold;
-      color: #00e676;
+      color: #7f9cf5;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
       z-index: 1000;
     }
 
-    .container {
-      max-width: 1200px;
-      margin: 30px auto;
+    .main-container {
+      display: flex;
+      flex: 1;
+    }
+
+    /* Left Sidebar */
+    .sidebar {
+      width: 250px;
+      background: #2b2b3a;
       padding: 20px;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+      overflow-y: auto;
+      box-shadow: 2px 0 5px rgba(0, 0, 0, 0.3);
+    }
+
+    .sidebar h3 {
+      color: #7f9cf5;
+      font-size: 20px;
+      margin-bottom: 20px;
+    }
+
+    .sidebar ul {
+      list-style-type: none;
+      padding-left: 0;
+    }
+
+    .sidebar ul li {
+      margin-bottom: 10px;
+    }
+
+    .sidebar ul li a {
+      color: #f5f5f5;
+      text-decoration: none;
+      font-size: 16px;
+      padding: 8px;
+      display: block;
+      transition: background 0.3s;
+    }
+
+    .sidebar ul li a:hover {
+      background: #393f58;
+    }
+
+    /* Main Content */
+    .container {
+      flex-grow: 1;
+      padding: 20px;
+      overflow-y: auto;
     }
 
     .commit {
-      background: #1e1e1e;
+      background: #2b2b3a;
       margin-bottom: 20px;
       border-radius: 10px;
       overflow: hidden;
       transition: transform 0.2s ease-in-out;
-      box-shadow: 0 0 10px rgba(0, 255, 170, 0.1);
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
     }
 
     .commit:hover {
-      transform: scale(1.01);
+      transform: scale(1.02);
     }
 
     .commit-header {
       padding: 16px;
-      background: #2b2b2b;
+      background: #393f58;
       cursor: pointer;
       display: flex;
       justify-content: space-between;
@@ -62,12 +110,12 @@
 
     .commit-title {
       font-size: 18px;
-      color: #00e676;
+      color: #7f9cf5;
     }
 
     .commit-message {
       font-style: italic;
-      color: #cccccc;
+      color: #aaa;
       margin-top: 4px;
     }
 
@@ -75,12 +123,12 @@
       display: none;
       padding: 20px;
       background: #222;
-      border-left: 4px solid #00e676;
+      border-left: 4px solid #7f9cf5;
     }
 
     .file-item {
       margin-bottom: 15px;
-      background: #2c2c2c;
+      background: #343a46;
       padding: 12px;
       border-radius: 6px;
     }
@@ -109,7 +157,7 @@
     }
 
     .toggle-btn {
-      background-color: #00e676;
+      background-color: #7f9cf5;
       color: #111;
       border: none;
       padding: 6px 10px;
@@ -120,7 +168,7 @@
     }
 
     .toggle-btn:hover {
-      background-color: #00c853;
+      background-color: #5a6ef5;
     }
 
     .badge {
@@ -133,27 +181,64 @@
     }
 
     @media (max-width: 768px) {
-      .commit-header {
+      .main-container {
         flex-direction: column;
-        align-items: flex-start;
       }
+
+      .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        box-shadow: none;
+      }
+
+      .container {
+        margin-left: 0;
+      }
+
+      a {
+        text-decoration: none;
+        color: inherit;
+      }
+      a:hover {
+        color: blue;
+      }
+
+      
     }
   </style>
 </head>
 <body>
   <header>📜 Groot Commit History Viewer</header>
-  <div class="container">
-    <div id="commitList">Loading commits...</div>
+  <div class="main-container">
+    <div class="sidebar">
+     <a href="/dashboard.html"><h3>Dashboard</h3></a>
+  
+      <ul>
+        <li><a href="#">Commit Overview</a></li>
+        <li><a href="#">File Status</a></li>
+        <li><a href="#">Branches</a></li>
+        <li><a href="#">Settings</a></li>
+      </ul>
+    </div>
+    <div class="container">
+      <div id="commitList">Loading commits...</div>
+    </div>
   </div>
 
   <script>
     document.addEventListener("DOMContentLoaded", () => {
-      fetch("http://localhost:3001/get-groot-data")
+      fetch("http://localhost:3002/get-groot-data")
         .then(res => res.json())
         .then(data => {
           const { commits, files } = data;
           const commitList = document.getElementById("commitList");
           commitList.innerHTML = "";
+
+          if (commits.length === 0) {
+            commitList.innerHTML = "No commits available.";
+            return;
+          }
 
           commits.forEach((commit, index) => {
             const commitElement = document.createElement("div");
